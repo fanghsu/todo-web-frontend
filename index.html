@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>雲端待辦清單 (Google Sheet 後端)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 0 20px;
+      line-height: 1.5;
+    }
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 16px;
+      background: #0066cc;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+    }
+    .status {
+      font-size: 14px;
+      color: #666;
+    }
+    .hint {
+      font-size: 12px;
+      color: #888;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>待辦事項清單</h2>
+  <div class="input-group">
+    <input type="text" id="todoInput" placeholder="輸入新的事項..." />
+    <button id="addBtn" onclick="handleAddTodo()">新增</button>
+  </div>
+
+  <button onclick="loadTodos()" style="background:#555; margin-bottom: 15px;">重新整理</button>
+
+  <ul id="todoList"></ul>
+  <p id="msg" class="hint"></p>
+
+  <script>
+    // ⚠️ 請替換為你在 Render 部署後的真實後端網址（末尾不加斜線）
+    const API_BASE_URL = 'https://flask-sheet-api-1.onrender.com';
+
+    // 載入待辦事項
+    async function loadTodos() {
+      const list = document.getElementById('todoList');
+      const msg = document.getElementById('msg');
+      list.innerHTML = '<li>載入中...</li>';
+      msg.textContent = 'Render 免費用戶若遇閒置休眠，首次喚醒需等待約 30-50 秒。';
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/todos`);
+        const json = await res.json();
+        
+        list.innerHTML = '';
+        if (json.success) {
+          msg.textContent = '';
+          if (json.data.length === 0) {
+            list.innerHTML = '<li>目前無任何項目</li>';
+            return;
+          }
+          json.data.forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span>${item.text}</span><span class="status">${item.done ? '✅ 已完成' : '⏳ 進行中'}</span>`;
+            list.appendChild(li);
+          });
+        } else {
+          list.innerHTML = `<li style="color:red">讀取失敗：${json.error}</li>`;
+        }
+      } catch (err) {
+        list.innerHTML = `<li style="color:red">連線失敗：${err.message}</li>`;
+      }
+    }
+
+    // 新增待辦事項
+    async function handleAddTodo() {
+      const input = document.getElementById('todoInput');
+      const btn = document.getElementById('addBtn');
+      const text = input.value.trim();
+
+      if (!text) return;
+
+      btn.disabled = true;
+      btn.textContent = '儲存中...';
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/todos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          input.value = '';
+          loadTodos(); // 重新讀取清單
+        } else {
+          alert('新增失敗：' + json.error);
+        }
+      } catch (err) {
+        alert('網路錯誤：' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '新增';
+      }
+    }
+
+    // 頁面載入時自動取得資料
+    window.addEventListener('DOMContentLoaded', loadTodos);
+  </script>
+</body>
+</html>
